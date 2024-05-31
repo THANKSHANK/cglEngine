@@ -36,30 +36,7 @@ class CGIengine:
         if self.keypressed == 2:
             # clear the framebuffer
             self.win.clearFB(0, 0, 0)
-        #self.downsample()
-        # push the window's framebuffer to the window
         self.win.applyFB()
-
-
-    # def downsample(self):
-    #     for x in range(self.w_width):
-    #         for y in range(self.w_height):
-    #             r, g, b = 0, 0, 0
-    #             for i in range(self.ssaa_factor):
-    #                 for j in range(self.ssaa_factor):
-    #                     r += self.framebuffer[x * self.ssaa_factor + i, y * self.ssaa_factor + j, 0]
-    #                     g += self.framebuffer[x * self.ssaa_factor + i, y * self.ssaa_factor + j, 1]
-    #                     b += self.framebuffer[x * self.ssaa_factor + i, y * self.ssaa_factor + j, 2]
-    #             r /= (self.ssaa_factor * self.ssaa_factor)
-    #             g /= (self.ssaa_factor * self.ssaa_factor)
-    #             b /= (self.ssaa_factor * self.ssaa_factor)
-    #             self.win.set_pixel(x, y, r, g, b)
-    #
-    # def set_ss_pixel(self, x, y,r,g,b):
-    #     if 0 <= x < self.high_res_width and 0 <= y < self.high_res_height:
-    #         self.framebuffer[x, y, 0] = r
-    #         self.framebuffer[x, y, 1] = g
-    #         self.framebuffer[x, y, 2] = b
 
 
     def addBuffer(self, n, data, n_per_vertex):

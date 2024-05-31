@@ -6,7 +6,7 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 
 class RitWindow:
-    def __init__(self, width, height, title="CSCI 610"):
+    def __init__(self, width, height, title="Computer Graphics Engine"):
         # window-related info
         self.width = width
         self.height = height
