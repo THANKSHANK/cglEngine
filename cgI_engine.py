@@ -286,20 +286,30 @@ class CGIengine:
         maxX = int(max(p0.get_varying('position').x, p1.get_varying('position').x, p2.get_varying('position').x))
         maxY = int(max(p0.get_varying('position').y, p1.get_varying('position').y, p2.get_varying('position').y))
 
+        samples = [
+            (0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)
+        ]
         # Iterate over each pixel within the bounding box
         for x in range(minX, maxX):
             for y in range(minY, maxY):
-                p = glm.vec2(x, y)
-                a = glm.vec2(p0.get_varying('position').x, p0.get_varying('position').y)
-                b = glm.vec2(p1.get_varying('position').x, p1.get_varying('position').y)
-                c = glm.vec2(p2.get_varying('position').x, p2.get_varying('position').y)
+                color_samples = []
+                for sample in samples:
+                    px, py = x + sample[0], y + sample[1]
+                    p = glm.vec2(px, py)
+                    a = glm.vec2(p0.get_varying('position').x, p0.get_varying('position').y)
+                    b = glm.vec2(p1.get_varying('position').x, p1.get_varying('position').y)
+                    c = glm.vec2(p2.get_varying('position').x, p2.get_varying('position').y)
 
-                l0, l1, l2 = self.barycentric_coordinates(a, b, c, p)
-                if l0 >= -epsilon and l1 >= -epsilon and l2 >= -epsilon: # Check if the point is inside the triangle
-                    z = p0.get_varying('position').z * l0 + p1.get_varying('position').z * l1 + p2.get_varying(
-                        'position').z * l2
-                    if 0 <= x < self.w_width and 0 <= y < self.w_height:
-                        if z < self.z_buffer[x, y]:
-                            self.z_buffer[x, y] = z
-                            color = fragment_shader.fragment_shader(p0, p1, p2, l0, l1, l2, uniforms)
-                            self.win.set_pixel(x, y, color[0], color[1], color[2])
+                    l0, l1, l2 = self.barycentric_coordinates(a, b, c, p)
+                    if l0 >= -epsilon and l1 >= -epsilon and l2 >= -epsilon:  # Check if the point is inside the triangle
+                        z = p0.get_varying('position').z * l0 + p1.get_varying('position').z * l1 + p2.get_varying(
+                            'position').z * l2
+                        if 0 <= x < self.w_width and 0 <= y < self.w_height:
+                            if z < self.z_buffer[x, y]:
+                                self.z_buffer[x, y] = z
+                                color = fragment_shader.fragment_shader(p0, p1, p2, l0, l1, l2, uniforms)
+                                color_samples.append(color)
+
+                if color_samples:
+                    final_color = np.mean(color_samples, axis=0)
+                    self.win.set_pixel(x, y, final_color[0], final_color[1], final_color[2])
