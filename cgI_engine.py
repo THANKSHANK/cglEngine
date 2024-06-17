@@ -8,6 +8,11 @@ from vertex import *
 import numpy as np
 import math
 
+class Ray:
+    def __init__(self, origin, direction):
+        self.origin = origin
+        self.direction = glm.normalize(direction)
+
 epsilon = 1e-6
 class CGIengine:
     def __init__(self, myWindow, defaction):
@@ -37,6 +42,15 @@ class CGIengine:
             # clear the framebuffer
             self.win.clearFB(0, 0, 0)
         self.win.applyFB()
+
+        # Render using ray tracing
+        framebuffer = self.render_ray_tracing(self.scene, self.w_width, self.w_height, 90, glm.vec3(0, 0, 0),
+                                              glm.vec3(0, 0, -1), glm.vec3(0, 1, 0))
+        for y in range(self.w_height):
+            for x in range(self.w_width):
+                self.win.set_pixel(x, y, framebuffer[y, x][0], framebuffer[y, x][1], framebuffer[y, x][2])
+        self.win.applyFB()
+
 
 
     def addBuffer(self, n, data, n_per_vertex):
@@ -288,7 +302,7 @@ class CGIengine:
 
         samples = [
             (0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)
-        ]
+        ] # multisampling
         # Iterate over each pixel within the bounding box
         for x in range(minX, maxX):
             for y in range(minY, maxY):
@@ -313,3 +327,56 @@ class CGIengine:
                 if color_samples:
                     final_color = np.mean(color_samples, axis=0)
                     self.win.set_pixel(x, y, final_color[0], final_color[1], final_color[2])
+
+    def generate_ray(self, x, y, width, height, fov, camera_pos, camera_target, camera_up):
+        aspect_ratio = width / height
+        scale = glm.tan(glm.radians(fov * 0.5))
+
+        image_x = (2 * (x + 0.5) / width - 1) * aspect_ratio * scale
+        image_y = (1 - 2 * (y + 0.5) / height) * scale
+
+        camera_forward = glm.normalize(camera_target - camera_pos)
+        camera_right = glm.normalize(glm.cross(camera_forward, camera_up))
+        camera_up = glm.cross(camera_right, camera_forward)
+
+        pixel_position = camera_pos + camera_forward + image_x * camera_right + image_y * camera_up
+        direction = pixel_position - camera_pos
+
+        return Ray(camera_pos, direction)
+
+    def trace_ray(self, ray, scene):
+        closest_hit = None
+        for obj in scene['objects']:
+            hit_info = obj.intersect(ray)
+            if hit_info and (closest_hit is None or hit_info['t'] < closest_hit['t']):
+                closest_hit = hit_info
+
+        if closest_hit:
+            return self.phong_shading(closest_hit, scene['light_pos'], scene['light_color'], scene['camera_pos'],
+                                      scene['ambient_color'], 0.1, 0.7, 0.2, 10)
+        else:
+            return np.array([0, 0, 0])  # Background color
+
+    def phong_shading(self, hit_info, light_pos, light_color, camera_pos, ambient_color, ka, kd, ks, shininess):
+        hit_point = hit_info['hit_point']
+        normal = hit_info['normal']
+        color = hit_info['color']
+
+        to_light = glm.normalize(light_pos - hit_point)
+        to_camera = glm.normalize(camera_pos - hit_point)
+
+        ambient = ka * ambient_color * color
+        diffuse = kd * max(glm.dot(normal, to_light), 0) * light_color * color
+        reflection = glm.reflect(-to_light, normal)
+        specular = ks * pow(max(glm.dot(reflection, to_camera), 0), shininess) * light_color
+
+        return glm.clamp(ambient + diffuse + specular, 0, 1)
+
+    def render_ray_tracing(self, scene, width, height, fov, camera_pos, camera_target, camera_up):
+        framebuffer = np.zeros((height, width, 3))
+        for y in range(height):
+            for x in range(width):
+                ray = self.generate_ray(x, y, width, height, fov, camera_pos, camera_target, camera_up)
+                color = self.trace_ray(ray, scene)
+                framebuffer[y, x] = color
+        return framebuffer

@@ -48,6 +48,7 @@ def default_action():
 
     modelT = myEngine.translate3D(2.0, 0.0, -5.0) * myEngine.scale3D(2.0, 2.0, 2.0)
     uniforms['modelT'] = modelT
+    uniforms['ocolor'] = [0.0, 1.0, 0.0]
     v_shader = vertex_shader_Phong()
     f_shader = fragment_shader_Phong()
 

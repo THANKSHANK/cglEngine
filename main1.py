@@ -7,62 +7,49 @@ import numpy as np
 from vertex_shader import *
 from fragment_shader import *
 
+class Sphere:
+    def __init__(self, center, radius, color):
+        self.center = center
+        self.radius = radius
+        self.color = color
+
+    def intersect(self, ray):
+        L = self.center - ray.origin
+        tca = glm.dot(L, ray.direction)
+        d2 = glm.dot(L, L) - tca * tca
+        if d2 > self.radius * self.radius:
+            return None
+        thc = glm.sqrt(self.radius * self.radius - d2)
+        t0 = tca - thc
+        t1 = tca + thc
+
+        if t0 < 0 and t1 < 0:
+            return None
+        t = t0 if t0 > 0 else t1
+        hit_point = ray.origin + t * ray.direction
+        normal = glm.normalize(hit_point - self.center)
+
+        return {'t': t, 'hit_point': hit_point, 'normal': normal, 'color': self.color}
 
 def default_action():
-    # clear the FB
     myEngine.win.clearFB(.25, .25, .75)
     myEngine.defineViewWindow(800, 0, 800, 0)
-    # set up your camera
-    viewT = myEngine.lookAt([0.0, 0.0, 0.0], [0, 0, -20], [0, 1, 0])
-    projectionT = myEngine.ortho3D(-3.0, 3.0, -3.0, 3.0, 0, 30.0)
 
-    myEngine.addBuffer('sphere', sphere, 3)
-    myEngine.addBuffer('sphere_idx', sphere_idx, 1)
-    myEngine.addBuffer('sphere_normals', sphere_normals, 3)
-    myEngine.addBuffer('sphere_uv', sphere_uv, 2)
-
-    myEngine.addBuffer('cube', cube, 3)
-    myEngine.addBuffer('cube_idx', cube_idx, 1)
-    myEngine.addBuffer('cube_normals', cube_normals, 3)
-    myEngine.addBuffer('cube_uv', cube_uv, 2)
-
-    myEngine.addBuffer('cylinder', cylinder, 3)
-    myEngine.addBuffer('cylinder_idx', cylinder_idx, 1)
-    myEngine.addBuffer('cylinder_normals', cylinder_normals, 3)
-    myEngine.addBuffer('cylinder_uv', cylinder_uv, 2)
-
-    myEngine.addBuffer('cone', cone, 3)
-    myEngine.addBuffer('cone_idx', cone_idx, 1)
-    myEngine.addBuffer('cone_normals', cone_normals, 3)
-    myEngine.addBuffer('cone_uv', cone_uv, 2)
-
-    v_shader = vertex_shader_Phong()
-    f_shader = fragment_shader_Phong()
-
-    modelT = myEngine.translate3D(0.0, 0.0, -5.0) * myEngine.scale3D(2.0, 2.0, 2.0)
-    #myEngine.drawTrianglesPhong(sphere, sphere_idx, sphere_normals, modelT, viewT, projectionT, [1.0, 0.0, 0.0],
-    #                            [1.0, 1.0, 1.0], [0.2, 0.4, 0.4], 10.0, [-2.0, 3.0, 2.0], [1.0, 1.0, 1.0],
-    #                            [1.0, 1.0, 1.0], True)
-
-    uniforms = {}
-    uniforms['viewT'] = viewT
-    uniforms['projectionT'] = projectionT
-    uniforms['ocolor'] = [1.0, 0.0, 0.0]
-    uniforms['scolor'] = [1.0, 1.0, 1.0]
-    uniforms['k'] = [0.2, 0.4, 0.4]
-    uniforms['exponent'] = 10.0
-    uniforms['lightpos'] = [-2.0, 3.0, 2.0]
-    uniforms['lightcolor'] = [1.0, 1.0, 1.0]
-    uniforms['amb_color'] = [1.0, 1.0, 1.0]
-    uniforms['modelT'] = modelT
-
-    #myEngine.drawTriangles('sphere', 'sphere_idx', 'sphere_normals', 'sphere_uv', v_shader, f_shader, uniforms)
-    #myEngine.drawTriangles('cube', 'cube_idx', 'cube_normals', 'cube_uv', v_shader, f_shader, uniforms)
-    #myEngine.drawTriangles('cylinder', 'cylinder_idx', 'cylinder_normals', 'cylinder_uv', v_shader, f_shader, uniforms)
-    myEngine.drawTriangles('cone', 'cone_idx', 'cone_normals', 'cone_uv', v_shader, f_shader, uniforms)
-
+    # Example scene setup
+    myEngine.scene = {
+        'objects': [
+            Sphere(glm.vec3(0, 0, -5), 1, glm.vec3(1, 0, 0)),
+            Sphere(glm.vec3(2, 0, -5), 1, glm.vec3(0, 1, 0))
+        ],
+        'light_pos': glm.vec3(0, 10, 0),
+        'light_color': glm.vec3(1, 1, 1),
+        'camera_pos': glm.vec3(0, 0, 0),
+        'camera_target': glm.vec3(0, 0, -1),
+        'camera_up': glm.vec3(0, 1, 0),
+        'ambient_color': glm.vec3(1, 1, 1)
+    }
 window = RitWindow(800, 800)
-myEngine = CGIengine(window, default_action,1)
+myEngine = CGIengine(window, default_action)
 
 
 def main():
