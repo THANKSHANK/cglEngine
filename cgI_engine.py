@@ -328,19 +328,19 @@ class CGIengine:
                     final_color = np.mean(color_samples, axis=0)
                     self.win.set_pixel(x, y, final_color[0], final_color[1], final_color[2])
 
-    def generate_ray(self, x, y, width, height, fov, camera_pos, camera_target, camera_up):
+    def generate_ray(self,x, y, width, height, fov, camera_pos, camera_target, camera_up):
         aspect_ratio = width / height
         scale = glm.tan(glm.radians(fov * 0.5))
 
         image_x = (2 * (x + 0.5) / width - 1) * aspect_ratio * scale
-        image_y = (1 - 2 * (y + 0.5) / height) * scale
+        image_y = (1 - 2 * (y + 0.5) / height) * scale * -1  # Inverting y-coordinate
 
         camera_forward = glm.normalize(camera_target - camera_pos)
         camera_right = glm.normalize(glm.cross(camera_forward, camera_up))
         camera_up = glm.cross(camera_right, camera_forward)
 
         pixel_position = camera_pos + camera_forward + image_x * camera_right + image_y * camera_up
-        direction = pixel_position - camera_pos
+        direction = glm.normalize(pixel_position - camera_pos)
 
         return Ray(camera_pos, direction)
 
