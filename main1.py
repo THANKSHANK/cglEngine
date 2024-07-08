@@ -62,7 +62,7 @@ def default_action():
     myEngine.drawTriangles('cone', 'cone_idx', 'cone_normals', 'cone_uv', v_shader, f_shader, uniforms)
 
 window = RitWindow(800, 800)
-myEngine = CGIengine(window, default_action,1)
+myEngine = CGIengine(window, default_action)
 
 
 def main():
