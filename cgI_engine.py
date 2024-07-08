@@ -38,28 +38,40 @@ class CGIengine:
             self.win.clearFB(0, 0, 0)
         self.win.applyFB()
 
-
-    def addBuffer(self, n, data, n_per_vertex):
+    def addBuffer(self, name, data, elements_per_vertex):
         """
         Add a buffer to the engine.
-        :param n:  name of the buffer
-        :param data:  data to be added
-        :param n_per_vertex:  number of elements per vertex
-        :return:  None
-        """
-        self.buffers[n] = []
-        buffer = []
-        for i in range(0, len(data), n_per_vertex):
-            buffer.append(data[i:i + n_per_vertex])
-        self.buffers[n] = buffer
 
-    def getBuffer(self, n):
+        :param name: Name of the buffer
+        :param data: Data to be added (list or array)
+        :param elements_per_vertex: Number of elements per vertex
+        :raises ValueError: If the data length is not a multiple of elements_per_vertex
+        """
+        if not isinstance(name, str):
+            raise TypeError("Buffer name must be a string")
+        if not isinstance(data, (list, np.ndarray)):
+            raise TypeError("Data must be a list or numpy array")
+        if not isinstance(elements_per_vertex, int) or elements_per_vertex <= 0:
+            raise ValueError("elements_per_vertex must be a positive integer")
+
+        if len(data) % elements_per_vertex != 0:
+            raise ValueError("Data length must be a multiple of elements_per_vertex")
+
+        buffer = [data[i:i + elements_per_vertex] for i in range(0, len(data), elements_per_vertex)]
+        self.buffers[name] = buffer
+
+    def getBuffer(self, name):
         """
         Get the buffer with the given name.
-        :param n:  name of the buffer
-        :return:  value of the buffer
+
+        :param name: Name of the buffer
+        :raises KeyError: If the buffer with the given name does not exist
+        :return: Value of the buffer
         """
-        return self.buffers[n]
+        if name not in self.buffers:
+            raise KeyError(f"Buffer '{name}' does not exist")
+
+        return self.buffers[name]
 
     def edge_function(self, a: glm.vec2, b: glm.vec2, p: glm.vec2):
         """
@@ -222,94 +234,93 @@ class CGIengine:
         normals = self.getBuffer(vertex_normals_buffer)
         uvs = self.getBuffer(vertex_uv_buffer)
 
+        if not callable(vertex_shader.vertex_shader):
+            raise TypeError("vertex_shader must have a callable method 'vertex_shader'")
+        if not callable(fragment_shader.fragment_shader):
+            raise TypeError("fragment_shader must have a callable method 'fragment_shader'")
+
+        required_uniforms = ['modelT', 'viewT', 'projectionT']
+        for uniform in required_uniforms:
+            if uniform not in uniforms:
+                raise ValueError(f"Uniform '{uniform}' is required but not provided")
+
         for i in range(0, len(indices), 3): # Iterate over each triangle
-            # create vertices
-            v0 = Vertex(indices[i][0])
-            v1 = Vertex(indices[i + 1][0])
-            v2 = Vertex(indices[i + 2][0])
+            try:
+                # create vertices
+                v0 = Vertex(indices[i][0])
+                v1 = Vertex(indices[i + 1][0])
+                v2 = Vertex(indices[i + 2][0])
 
-            # attach varying
-            v0.attach_varying('position', vertex_pos[v0.get_id()])
-            v1.attach_varying('position', vertex_pos[v1.get_id()])
-            v2.attach_varying('position', vertex_pos[v2.get_id()])
+                # Attach varying attributes
+                for v in [v0, v1, v2]:
+                    v.attach_varying('position', vertex_pos[v.get_id()])
+                    v.attach_varying('normal', normals[v.get_id()])
+                    v.attach_varying('uvs', uvs[v.get_id()])
 
-            v0.attach_varying('normal', normals[v0.get_id()])
-            v1.attach_varying('normal', normals[v1.get_id()])
-            v2.attach_varying('normal', normals[v2.get_id()])
+                # vertex shader
+                v0 = vertex_shader.vertex_shader(v0, uniforms)
+                v1 = vertex_shader.vertex_shader(v1, uniforms)
+                v2 = vertex_shader.vertex_shader(v2, uniforms)
 
-            v0.attach_varying('uvs', uvs[v0.get_id()])
-            v1.attach_varying('uvs', uvs[v1.get_id()])
-            v2.attach_varying('uvs', uvs[v2.get_id()])
+                # rasterize
+                for v in [v0, v1, v2]:
+                    p = v.get_varying('position')
+                    v.attach_varying('pos', p)
+                    p = glm.vec3(p.x, p.y, p.z)
+                    p.x = int(p.x * self.scaleX + self.offsetX)
+                    p.y = int(p.y * self.scaleY + self.offsetY)
+                    v.attach_varying('position', p)
 
-            # vertex shader
-            v0 = vertex_shader.vertex_shader(v0, uniforms)
-            v1 = vertex_shader.vertex_shader(v1, uniforms)
-            v2 = vertex_shader.vertex_shader(v2, uniforms)
-
-            # rasterize
-            p0 = v0.get_varying('position')
-            v0.attach_varying('pos', p0) # world space position
-            p0 = glm.vec3(p0.x, p0.y, p0.z)
-            p0.x = int(p0.x * self.scaleX + self.offsetX)
-            p0.y = int(p0.y * self.scaleY + self.offsetY)
-            v0.attach_varying('position', p0) # screen space position
-
-            p1 = v1.get_varying('position')
-            v1.attach_varying('pos', p1)
-            p1 = glm.vec3(p1.x, p1.y, p1.z)
-            p1.x = int(p1.x * self.scaleX + self.offsetX)
-            p1.y = int(p1.y * self.scaleY + self.offsetY)
-            v1.attach_varying('position', p1)
-
-            p2 = v2.get_varying('position')
-            v2.attach_varying('pos', p2)
-            p2 = glm.vec3(p2.x, p2.y, p2.z)
-            p2.x = int(p2.x * self.scaleX + self.offsetX)
-            p2.y = int(p2.y * self.scaleY + self.offsetY)
-            v2.attach_varying('position', p2)
-
-            self.rasterizeTriangle(v0, v1, v2, fragment_shader, uniforms)
+                self.rasterizeTriangle(v0, v1, v2, fragment_shader, uniforms)
+            except Exception as e:
+               print(f"Error processing triangle {i // 3}: {e}")
 
     def rasterizeTriangle(self, p0, p1, p2, fragment_shader, uniforms):
         """
         Rasterize a triangle.
-        :param p0:  vertex 0
-        :param p1:  vertex 1
-        :param p2:  vertex 2
-        :param fragment_shader: fragment shader
-        :param uniforms:  uniforms
-        :return:
+        :param p0: Vertex 0
+        :param p1: Vertex 1
+        :param p2: Vertex 2
+        :param fragment_shader: Fragment shader object
+        :param uniforms: Uniforms dictionary
+        :raises TypeError: If fragment_shader is not callable
+        :return: None
         """
-        # Get the bounding box
-        minX = int(min(p0.get_varying('position').x, p1.get_varying('position').x, p2.get_varying('position').x))
-        minY = int(min(p0.get_varying('position').y, p1.get_varying('position').y, p2.get_varying('position').y))
-        maxX = int(max(p0.get_varying('position').x, p1.get_varying('position').x, p2.get_varying('position').x))
-        maxY = int(max(p0.get_varying('position').y, p1.get_varying('position').y, p2.get_varying('position').y))
+        if not callable(fragment_shader.fragment_shader):
+            raise TypeError("fragment_shader must have a callable method 'fragment_shader'")
 
-        samples = [
-            (0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)
-        ]
-        # Iterate over each pixel within the bounding box
-        for x in range(minX, maxX):
-            for y in range(minY, maxY):
-                color_samples = []
-                for sample in samples:
-                    px, py = x + sample[0], y + sample[1]
-                    p = glm.vec2(px, py)
-                    a = glm.vec2(p0.get_varying('position').x, p0.get_varying('position').y)
-                    b = glm.vec2(p1.get_varying('position').x, p1.get_varying('position').y)
-                    c = glm.vec2(p2.get_varying('position').x, p2.get_varying('position').y)
+        try:
+            # Get the bounding box
+            minX = int(min(p0.get_varying('position').x, p1.get_varying('position').x, p2.get_varying('position').x))
+            minY = int(min(p0.get_varying('position').y, p1.get_varying('position').y, p2.get_varying('position').y))
+            maxX = int(max(p0.get_varying('position').x, p1.get_varying('position').x, p2.get_varying('position').x))
+            maxY = int(max(p0.get_varying('position').y, p1.get_varying('position').y, p2.get_varying('position').y))
 
-                    l0, l1, l2 = self.barycentric_coordinates(a, b, c, p)
-                    if l0 >= -epsilon and l1 >= -epsilon and l2 >= -epsilon:  # Check if the point is inside the triangle
-                        z = p0.get_varying('position').z * l0 + p1.get_varying('position').z * l1 + p2.get_varying(
-                            'position').z * l2
-                        if 0 <= x < self.w_width and 0 <= y < self.w_height:
-                            if z < self.z_buffer[x, y]:
-                                self.z_buffer[x, y] = z
-                                color = fragment_shader.fragment_shader(p0, p1, p2, l0, l1, l2, uniforms)
-                                color_samples.append(color)
+            samples = [(0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)]
 
-                if color_samples:
-                    final_color = np.mean(color_samples, axis=0)
-                    self.win.set_pixel(x, y, final_color[0], final_color[1], final_color[2])
+            # Iterate over each pixel within the bounding box
+            for x in range(minX, maxX):
+                for y in range(minY, maxY):
+                    color_samples = []
+                    for sample in samples:
+                        px, py = x + sample[0], y + sample[1]
+                        p = glm.vec2(px, py)
+                        a = glm.vec2(p0.get_varying('position').x, p0.get_varying('position').y)
+                        b = glm.vec2(p1.get_varying('position').x, p1.get_varying('position').y)
+                        c = glm.vec2(p2.get_varying('position').x, p2.get_varying('position').y)
+
+                        l0, l1, l2 = self.barycentric_coordinates(a, b, c, p)
+                        if l0 >= -epsilon and l1 >= -epsilon and l2 >= -epsilon:  # Check if the point is inside the triangle
+                            z = p0.get_varying('position').z * l0 + p1.get_varying('position').z * l1 + p2.get_varying(
+                                'position').z * l2
+                            if 0 <= x < self.w_width and 0 <= y < self.w_height:
+                                if z < self.z_buffer[x, y]:
+                                    self.z_buffer[x, y] = z
+                                    color = fragment_shader.fragment_shader(p0, p1, p2, l0, l1, l2, uniforms)
+                                    color_samples.append(color)
+
+                    if color_samples:
+                        final_color = np.mean(color_samples, axis=0)
+                        self.win.set_pixel(x, y, final_color[0], final_color[1], final_color[2])
+        except Exception as e:
+            print(f"Error rasterizing triangle: {e}")
