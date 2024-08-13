@@ -1,0 +1,1 @@
+A computer graphics engine which is enable 2D and 3D rendering, transformations (for modeling, viewing, projection, normalization, and viewport), hierarchy, clipping, illumination, texturing (image texture, checkerboard) and anti-aliasing.
